@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Registo de Manutenções</title>
+
+<!-- Biblioteca XLSX para importar/exportar Excel/CSV -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+/* ======== ESTILOS ======== */
+body {
+  font-family: Arial, sans-serif;
+  background:#F0F8FF;
+  margin:30;
+}
+.tabs {
+  display: flex;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  background: #ddd;
+  cursor: pointer;
+  border-radius: 15px 15px 0 10px;
+}
+.tab.active { background:#388E3C; color:white; }
+.container { padding:10px; display:none; border:1px solid #ccc;
+table {
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+  background:white;
+  font-size:13px;
+}
+th,td {
+  border:1px solid #ccc;
+  padding:4px;
+  text-align:left;
+  cursor:pointer;
+}
+th { background:#eee; cursor:default; }
+input, select, button {
+  padding:5px;
+  margin:4px 0;
+  font-size:13px;
+}
+input[type="text"], input[type="date"] { width:200px; }
+tr.selected { background:#cde !important; }
+.filters, .form-area {
+  background:#ddd;
+  padding:10px;
+  border-radius:6px;
+  margin-top:10px;
+}
+.form-area {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #ddd;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+
+  /* Nova organização em grelha */
+  display: grid;
+  grid-template-columns: 150px 1fr; /* 1ª coluna: rótulo fixo / 2ª coluna: input */
+  gap: 6px 12px; /* espaço entre linhas e colunas */
+}
+
+.form-area label {
+  text-align: right;         /* Alinha o texto dos rótulos à direita */
+  padding-top: 6px;
+  font-weight: bold;
+}
+
+.form-area input {
+  width: 250px;               /* 🔹 Define mesma largura para todos */
+  padding: 6px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ======== ABAS ======== -->
+<div class="tabs">
+  <div class="tab active" data-tab="combustivel">Combustível</div>
+  <div class="tab" data-tab="serviços">Serviços</div>
+  <div class="tab" data-tab="veiculos">Veículos</div>
+  <div class="tab" data-tab="exportar">Exportar</div>
+</div>
+
+<!-- ======== CONTAINERS ======== -->
+<div id="combustivel" class="container" style="display:block;"></div>
+<div id="serviços" class="container"></div>
+<div id="veiculos" class="container"></div>
+
+<div id="exportar" class="container">
+  <h2>Exportar Registos</h2>
+  <button onclick="exportarExcel()">💾 Exportar para Excel</button>
+</div>
+
+<script>
+/* ==========================================================
+   1) CONFIGURAÇÃO DE CAMPOS
+   ========================================================== */
+const camposFuel = [
+  "Row ID","Vehicle ID","Odometer","Qty","Partial Tar","Missed Fill",
+  "Total Cost","Dist Travelled","Eff","Octane","Fuel Brand",
+  "Filling Star Notes","Day","Month","Year","Receipt Path",
+  "Lat","Long","Record Type","Record Desc"
+];
+
+const camposVeiculos = [
+  "Row ID","Make","Model","Fuel Type","Year","Lic#","VIN","Insurance#",
+  "Notes","Picture Path","Vehicle Docs","Vehicle Img Names",
+  "Vehicle ID","Other Specs"
+];
+
+const camposServiços = [
+  "Row ID","Vehicle ID","Record Type","Service Name","Recurring",
+  "Due Miles","Due Days","Last Odo","Last Date"
+];
+
+const separadores = {
+  combustivel:     { campos: camposFuel },
+  serviços: { campos: camposServiços },
+  veiculos: { campos: camposVeiculos }
+};
+
+/* ==========================================================
+   2) VARIÁVEIS GLOBAIS
+   ========================================================== */
+const dados   = { combustivel:[], serviços:[], veiculos:[] };
+const selecao = {}; // índice da linha selecionada
+
+// Repor dados guardados em localStorage
+Object.keys(dados).forEach(k => {
+  dados[k] = JSON.parse(localStorage.getItem(k) || "[]");
+});
+
+/* ==========================================================
+   3) CRIAÇÃO DINÂMICA DA UI
+   ========================================================== */
+for (let key in separadores) {
+  const cont   = document.getElementById(key);
+  const campos = separadores[key].campos;
+
+  cont.innerHTML = `
+    <h2>${key[0].toUpperCase()+key.slice(1)}</h2>
+
+    <input type="file" accept=".csv" onchange="importarCSV(event,'${key}')"><br>
+
+    <div class="form-area">
+            ${campos.map(c=>`
+        <label for="${key}-${c}">${c}:</label>
+        <input id="${key}-${c}">
+      `).join("")}
+    </div>
+    <br>
+    <button onclick="guardar('${key}')">Guardar</button>
+    <button onclick="cancelar('${key}')">Cancelar</button>
+    <button onclick="apagarSelecionado('${key}')">Apagar Selecionado</button><br><br>
+      <h2>Filtros</h2>
+    <div class="filters">
+      
+      Veículo: <input id="${key}-f-vehicle">
+      Combustível: <input id="${key}-f-fuel">
+      Data: <input type="date" id="${key}-f-date">
+      <button onclick="aplicarFiltro('${key}')">Filtrar</button>
+      <button onclick="limparFiltro('${key}')">Limpar</button>
+    </div>
+
+    <table id="tab-${key}">
+      <thead><tr>${campos.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+      <tbody></tbody>
+    </table>
+  `;
+
+  renderTabela(key);
+}
+
+/* ==========================================================
+   4) MUDANÇA DE ABAS
+   ========================================================== */
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".container").forEach(c => c.style.display="none");
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).style.display="block";
+  };
+});
+
+/* ==========================================================
+   5) RENDERIZAÇÃO DA TABELA
+   ========================================================== */
+function renderTabela(secao, filtro=null){
+  const tbody = document.querySelector(`#tab-${secao} tbody`);
+  let lista   = dados[secao] || [];
+
+  if (filtro) {
+    lista = lista.filter(r =>
+      (!filtro.veiculo || (r["Vehicle ID"] || "").toLowerCase().includes(filtro.veiculo.toLowerCase())) &&
+      (!filtro.combustivel    || (r["Fuel Type"]  || "").toLowerCase().includes(filtro.combustivel.toLowerCase())) &&
+      (!filtro.data    || (r.Data         || "").startsWith(filtro.data))
+    );
+  }
+
+  tbody.innerHTML = lista.map((reg,i)=>`
+    <tr onclick="selecionarLinha('${secao}',${i},this)">
+      ${separadores[secao].campos.map(c=>`<td>${reg[c]||""}</td>`).join("")}
+    </tr>
+  `).join("");
+}
+
+/* ==========================================================
+   6) SELEÇÃO DE LINHA
+   ========================================================== */
+function selecionarLinha(secao, i, linha){
+  selecao[secao] = i;
+  document.querySelectorAll(`#tab-${secao} tbody tr`)
+          .forEach(tr=>tr.classList.remove("selected"));
+  linha.classList.add("selected");
+
+  const reg = dados[secao][i];
+  separadores[secao].campos.forEach(c=>{
+    document.getElementById(`${secao}-${c}`).value = reg[c] || "";
+  });
+  dados[secao].editIndex = i;
+}
+
+/* ==========================================================
+   7) CRUD (Guardar, Cancelar, Apagar)
+   ========================================================== */
+function guardar(secao){
+  const reg = {};
+  separadores[secao].campos.forEach(c=>{
+    reg[c] = document.getElementById(`${secao}-${c}`).value.trim();
+  });
+
+  // REMOVIDO: alerta se algum campo estiver vazio
+  // if (Object.values(reg).some(v=>v==="")) {
+  //   alert("Preencha todos os campos.");
+  //   return;
+  // }
+
+  if (typeof dados[secao].editIndex === "number") {
+    dados[secao][dados[secao].editIndex] = reg;
+    delete dados[secao].editIndex;
+  } else {
+    dados[secao].push(reg);
+  }
+
+  localStorage.setItem(secao, JSON.stringify(dados[secao]));
+  limparCampos(secao);
+  renderTabela(secao);
+}
+
+
+function cancelar(secao){
+  limparCampos(secao);
+  delete dados[secao].editIndex;
+  selecao[secao] = null;
+  document.querySelectorAll(`#tab-${secao} tbody tr`)
+          .forEach(tr=>tr.classList.remove("selected"));
+}
+
+function apagarSelecionado(secao){
+  if (selecao[secao] == null) {
+    alert("Selecione uma linha primeiro.");
+    return;
+  }
+  if (confirm("Tem a certeza que quer apagar este registo?")) {
+    dados[secao].splice(selecao[secao],1);
+    localStorage.setItem(secao, JSON.stringify(dados[secao]));
+    selecao[secao] = null;
+    limparCampos(secao);
+    renderTabela(secao);
+  }
+}
+
+function limparCampos(secao){
+  separadores[secao].campos.forEach(c=>{
+    document.getElementById(`${secao}-${c}`).value="";
+  });
+}
+
+/* ==========================================================
+   8) FILTROS
+   ========================================================== */
+function aplicarFiltro(secao){
+  const veiculo = document.getElementById(`${secao}-f-vehicle`).value.trim();
+  const combustivel    = document.getElementById(`${secao}-f-fuel`).value.trim();
+  const data    = document.getElementById(`${secao}-f-date`).value;
+  renderTabela(secao,{ veiculo, combustivel, data });
+}
+
+function limparFiltro(secao){
+  document.getElementById(`${secao}-f-vehicle`).value = "";
+  document.getElementById(`${secao}-f-fuel`).value    = "";
+  document.getElementById(`${secao}-f-date`).value    = "";
+  renderTabela(secao);
+}
+
+/* ==========================================================
+   9) IMPORTAÇÃO DE CSV
+   ========================================================== */
+function importarCSV(e, secao){
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const wb    = XLSX.read(evt.target.result,{type:"binary", raw:true});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const arr = XLSX.utils.sheet_to_json(sheet,{header:1, defval:""});
+    const cab = arr[0].map(c => (c || "").trim());
+    const esperado = separadores[secao].campos;
+    dados[secao] = arr.slice(1).map(l => {
+      const obj = {};
+      esperado.forEach(c => {
+        const idx = cab.indexOf(c);
+        obj[c] = idx >= 0 ? (l[idx] || "") : "";
+      });
+      return obj;
+    });
+
+
+    localStorage.setItem(secao, JSON.stringify(dados[secao]));
+    renderTabela(secao);
+  };
+  reader.readAsBinaryString(file);
+}
+
+/* ==========================================================
+   10) EXPORTAÇÃO PARA EXCEL
+   ========================================================== */
+function exportarExcel(){
+  const wb = XLSX.utils.book_new();
+  for (let secao in separadores) {
+    const arr = [separadores[secao].campos];
+    dados[secao].forEach(r=>{
+      arr.push(separadores[secao].campos.map(c=>r[c]||""));
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(arr), secao);
+  }
+  XLSX.writeFile(wb,"Manutencoes.xlsx");
+}
+
+/* ==========================================================
+   11) INICIALIZAÇÃO
+   ========================================================== */
+window.onload = () => {
+  Object.keys(separadores).forEach(secao => renderTabela(secao));
+};
+</script>
+
+<footer style="text-align:right;margin-top:10px;font-size:22px;font-family:'Brush Script MT'">
+  Rui Baptista
+</footer>
+
+</body>
+</html>
