@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Gestão de Manutenções</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background-image: url("avac.jpg");}
@@ -121,6 +123,23 @@
     <button onclick="importarExcel()" style="color: blue;">Importar do Excel</button>
   </div>
   <script>
+  // --------- LOCAL STORAGE ---------
+  function guardarLocal() {
+    localStorage.setItem("manutencoes", JSON.stringify(manutencoes));
+    localStorage.setItem("stock", JSON.stringify(stock));
+    localStorage.setItem("notas", JSON.stringify(notas));
+  }
+
+  function carregarLocal() {
+    manutencoes = JSON.parse(localStorage.getItem("manutencoes")) || [];
+    stock = JSON.parse(localStorage.getItem("stock")) || [];
+    notas = JSON.parse(localStorage.getItem("notas")) || [];
+
+    renderNovo();
+    renderStock();
+    renderNota();
+  }
+
     // --------- DADOS ---------
     let manutencoes = [], stock = [], notas = [];
 
@@ -140,7 +159,7 @@
       const idx = indiceEditarNovo.value;
       const reg = { empresa: empresa.value, edificio: edificio.value, tipo: tipo.value, data: dataNovo.value, obs: obs.value };
       if (idx) manutencoes[idx] = reg; else manutencoes.push(reg);
-      renderNovo(); resetForm("formNovo");
+      guardarLocal();renderNovo(); resetForm("formNovo");
     });
 
     document.getElementById("formStock").addEventListener("submit", e => {
@@ -148,7 +167,7 @@
       const idx = indiceEditarStock.value;
       const reg = { data: dataStock.value, tipo: tipoStock.value, produto: produto.value, quantidade: quantidade.value };
       if (idx) stock[idx] = reg; else stock.push(reg);
-      renderStock(); resetForm("formStock");
+      guardarLocal();renderStock(); resetForm("formStock");
     });
 
     document.getElementById("formFiltro").addEventListener("submit", e => {
@@ -160,7 +179,7 @@
     function guardarNota() {
       const idx = indiceEditarNota.value;
       if (idx) notas[idx] = textoNota.value; else notas.push(textoNota.value);
-      renderNota(); resetFormNota();
+      guardarLocal();renderNota(); resetFormNota();
     }
 
     // --------- RENDER ---------
@@ -283,7 +302,7 @@
 
     function abrirLink() {
       // coloca aqui o link da Manutenção Preventiva
-      const url = "https://1drv.ms/x/c/2863be5604cde3e6/EWgiEUczPRxAiCgZyF0AxKcBQOSv-FJAVMakR6LuGYC_Vg?e=bylhfg";
+      const url = "https://uminho365-my.sharepoint.com/:x:/r/personal/f14491_uminho_pt/Documents/Manuten%C3%A7%C3%A3o_Preventiva.xlsx?d=w92cf980bf7e24f069ac9e6afd86ead26&csf=1&web=1&e=E9xln0";
       window.open(url, "_blank"); // abre numa nova aba
     }
 
@@ -295,13 +314,13 @@
 
     function abrirLink3() {
       // coloca aqui o link das Leituras
-      const url = "https://uminho365-my.sharepoint.com/:x:/r/personal/f14491_uminho_pt/Documents/Leituras.xlsx?d=wad995df2214b4466ba17669a2082ac93&csf=1&web=1&e=sXXdGF";
+      const url = "https://uminho365-my.sharepoint.com/:x:/r/personal/f14491_uminho_pt/_layouts/15/Doc.aspx?sourcedoc=%7BAD995DF2-214B-4466-BA17-669A2082AC93%7D&file=Leituras.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1";
       window.open(url, "_blank"); // abre numa nova aba
     }
 
     function openLink() {
       // coloca aqui o link do Controle de Stocks
-      const url = "https://1drv.ms/x/c/2863be5604cde3e6/EcYHIppYro1EhTRyVpXDPi4BwXYek8uma0NTSPPvnEkR6A?e=pmZwtU";
+      const url = "https://uminho365-my.sharepoint.com/:x:/r/personal/f14491_uminho_pt/Documents/Controle-de-Stock_UTAs.xlsx?d=w18cbcab82d9b41fb94ea1b89373a48f8&csf=1&web=1&e=eS5XJG";
       window.open(url, "_blank"); // abre numa nova aba
     }
 
@@ -316,10 +335,19 @@
       const url = "https://uminho365-my.sharepoint.com/my?viewid=8d5fabc0%2D2c0b%2D4ca0%2D9de0%2D81323a91323a&CT=1747040050901&OR=OWA%2DNT%2DMail&e=5%3A67e88637854b44048575e7a6a30d48c3&sharingv2=true&fromShare=true&at=9&FolderCTID=0x01200065B8B3FF27D6AB49A2FD2D662C8E3545&id=%2Fpersonal%2Ff14491%5Fuminho%5Fpt%2FDocuments%2FPlantaAR%2Epdf&parent=%2Fpersonal%2Ff14491%5Fuminho%5Fpt%2FDocuments";
       window.open(url, "_blank"); // abre numa nova aba
     }
+  // Carregar dados locais ao iniciar
+  carregarLocal();
+
+  // --------- ALERTA AO FECHAR JANELA ---------
+  window.addEventListener("beforeunload", function (e) {
+    const mensagem = "Tem dados não exportados.\nDeseja exportar para Excel antes de sair?";
+    e.preventDefault();
+    e.returnValue = mensagem; // obrigatório para o browser mostrar o alerta
+    return mensagem;
+});
 
   </script>
 </body>
 <footer style="text-align: right; margin-top: 10px; font-size: 24px; font-family: Brush Script MT; color: blue;">Rui Baptista</footer>
 <footer style="text-align: right; margin-top: 10px; font-size: 24px; font-family: Brush Script MT; color: red;">2025</footer>
 </html>
-
