@@ -14,7 +14,7 @@
       font-family: Candara ;
     }
     .tabs { display: flex; margin-bottom: 15px; flex-wrap: wrap; }
-    .tab { flex: 1; padding: 10px; text-align: center; background: #ddd; cursor: pointer; border-radius: 15px 15px 0 10px; }
+    .tab { flex: 1; padding: 8px; text-align: center; background: #ddd; cursor: pointer; border-radius: 15px 15px 0 10px; }
     .tab.active { background: lightblue; font-weight: bold; border-bottom: 2px solid #fff; }
     .content { display: none; background: #fff; padding: 15px; border-radius: 0 5px 5px 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .content.active { display: block; background: #FFFAFA;}
@@ -22,17 +22,27 @@
     form input, form select, form textarea { width: 100%; padding: 6px;}
     button { margin: 8px 5px 0 0; padding: 6px 12px; cursor: pointer; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    td { border: 1px solid #aaa; padding: 6px; text-align: left; }
-    tr.selected { background: #ffe4b5; }
+    td { border: 1px solid #aaa; padding: 8px; text-align: left; white-space: pre-wrap; /* mantém quebras de linha */ }
+    tr.selected { background: #ffe4b5; white-space: pre-wrap; cursor: pointer;/* mantém quebras de linha */}
+    tr {
+      cursor: pointer;
+    }
     th {
       border: 1px solid #aaa;
-      padding: 6px;
+      padding: 8px;
       text-align: center;
-      background-color: grey;
+      background-color: green;
+      white-space: pre-wrap; /* mantém quebras de linha */
+      cursor: pointer;
     }
     .total { margin-top: 8px; font-weight: bold; text-align: right;}
     header {
       text-align: right;
+    }
+    #statusAlteracoes {
+      margin-left: auto;
+      font-weight: bold;
+      display: none;
     }
   </style>
 </head>
@@ -42,15 +52,16 @@
   </header>
   <h1>Registos</h1>
 
-  <!-- Separadores -->
+  <!-- Separadores / 🔴 INDICADOR-->
   <div class="tabs">
     <button class="tab active" data-tab="novo">🛠️ Novo</button>
     <button class="tab" data-tab="stock">📦 Stock</button>
     <button class="tab" data-tab="filtros">🔍 Filtros</button>
     <button class="tab" data-tab="notas">📝 Notas</button>
-    <button class="tab" data-tab="excel">🛠️ Importar Excel</button>
+    <button class="tab" data-tab="excel">⬇️ Importar Excel</button>
   </div>
-
+  <div id="statusAlteracoes">🔴 Alterações não guardadas</div>
+  
   <!-- Novo Registo -->
   <div class="content active" id="novo">
     <h2>Novo Registo</h2>
@@ -58,7 +69,7 @@
       <input type="hidden" id="indiceEditarNovo">
       <label>Empresa: <input type="text" id="empresa" required></label>
       <label>Edifício: <input type="text" id="edificio" required></label>
-      <label>Tipo: <input type="text" id="tipo" required></label>
+      <label>Descrição: <textarea id="tipo" rows= "3" required></textarea></label>
       <label>Data: <input type="date" id="dataNovo" required></label>
       <label>Observações: <input type="text" id="obs"></label>
       <button type="submit"style="background-color: green;">Guardar</button>
@@ -68,7 +79,18 @@
       <button type="button" onclick="abrirLink()">Manutenção Preventiva</button>
       <button onclick="exportarExcel()" style="color: blue;">Exportar para Excel</button>    
     </form>
-    <table id="tabelaNovo"><thead><tr><th>Empresa</th><th>Edifício</th><th>Tipo</th><th>Data</th><th>Obs</th></tr></thead><tbody></tbody></table>
+    <table id="tabelaNovo">
+      <thead>
+        <tr>
+          <th onclick="ordenarNovo('empresa')">⬇️Empresa</th>
+          <th onclick="ordenarNovo('edificio')">⬇️Edifício</th>
+          <th onclick="ordenarNovo('tipo')">⬇️ Descrição</th>
+          <th onclick="ordenarNovo('data')">⬇️ Data</th>
+          <th onclick="ordenarNovo('obs')">⬇️ Obs</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
     <div id="totalNovo" class="total"></div>
   </div>
 
@@ -99,7 +121,7 @@
       <button type="submit"style="background-color: green;">Aplicar</button>
       <button type="button" onclick="limparFiltros()"style="background-color: red;">Cancelar</button>
     </form>
-    <table id="tabelaFiltro"><thead><tr><th>Empresa</th><th>Edifício</th><th>Tipo</th><th>Data</th><th>Obs</th></tr></thead><tbody></tbody></table>
+    <table id="tabelaFiltro"><thead><tr><th>Empresa</th><th>Edifício</th><th>Descrição</th><th>Data</th><th>Obs</th></tr></thead><tbody></tbody></table>
     <div id="totalFiltro" class="total"></div>
   </div>
 
@@ -107,7 +129,7 @@
   <div class="content" id="notas">
     <h2>Notas</h2>
     <input type="hidden" id="indiceEditarNota">
-    <textarea id="textoNota" rows="4" cols="181" style="font-size: 18px;"></textarea><br>
+    <textarea id="textoNota" rows="6" cols="180" style="font-size: 18px;"></textarea><br>
     <button onclick="guardarNota()" style="background-color: green;">Guardar</button>
     <button onclick="resetFormNota()" style="background-color: red;">Cancelar</button>
     <button type="button" onclick="openLink2()">Tarefas</button>
@@ -123,6 +145,18 @@
     <button onclick="importarExcel()" style="color: blue;">Importar do Excel</button>
   </div>
   <script>
+
+    function marcarAlteracao(){
+      dadosAlterados = true;
+      document.getElementById("statusAlteracoes").style.display="block";
+    }
+
+    function limparAlteracao(){
+      dadosAlterados = false;
+      document.getElementById("statusAlteracoes").style.display="none";
+    }
+    
+
   // --------- LOCAL STORAGE ---------
   function guardarLocal() {
     localStorage.setItem("manutencoes", JSON.stringify(manutencoes));
@@ -135,6 +169,8 @@
     stock = JSON.parse(localStorage.getItem("stock")) || [];
     notas = JSON.parse(localStorage.getItem("notas")) || [];
 
+    aplicarOrdenacaoNovo();
+
     renderNovo();
     renderStock();
     renderNota();
@@ -142,6 +178,9 @@
 
     // --------- DADOS ---------
     let manutencoes = [], stock = [], notas = [];
+    let dadosAlterados = false;
+    let ordemCampoNovo = localStorage.getItem("ordemCampoNovo") || "data";
+    let ordemDirecaoNovo = localStorage.getItem("ordemDirecaoNovo") || "asc";
 
     // --------- TABS ---------
     document.querySelectorAll(".tab").forEach(tab => {
@@ -159,7 +198,7 @@
       const idx = indiceEditarNovo.value;
       const reg = { empresa: empresa.value, edificio: edificio.value, tipo: tipo.value, data: dataNovo.value, obs: obs.value };
       if (idx) manutencoes[idx] = reg; else manutencoes.push(reg);
-      guardarLocal();renderNovo(); resetForm("formNovo");
+      marcarAlteracao();guardarLocal();renderNovo(); resetForm("formNovo");
     });
 
     document.getElementById("formStock").addEventListener("submit", e => {
@@ -167,7 +206,7 @@
       const idx = indiceEditarStock.value;
       const reg = { data: dataStock.value, tipo: tipoStock.value, produto: produto.value, quantidade: quantidade.value };
       if (idx) stock[idx] = reg; else stock.push(reg);
-      guardarLocal();renderStock(); resetForm("formStock");
+      marcarAlteracao();guardarLocal();renderStock(); resetForm("formStock");
     });
 
     document.getElementById("formFiltro").addEventListener("submit", e => {
@@ -179,11 +218,54 @@
     function guardarNota() {
       const idx = indiceEditarNota.value;
       if (idx) notas[idx] = textoNota.value; else notas.push(textoNota.value);
-      guardarLocal();renderNota(); resetFormNota();
+      marcarAlteracao();guardarLocal();renderNota(); resetFormNota();
     }
+
+    function ordenarNovo(campo) {
+
+  if (ordemCampoNovo === campo) {
+    ordemDirecaoNovo = ordemDirecaoNovo === "asc" ? "desc" : "asc";
+  } else {
+    ordemCampoNovo = campo;
+    ordemDirecaoNovo = "asc";
+  }
+
+  localStorage.setItem("ordemCampoNovo", ordemCampoNovo);
+  localStorage.setItem("ordemDirecaoNovo", ordemDirecaoNovo);
+
+  aplicarOrdenacaoNovo();
+  renderNovo();
+}
+
+  function aplicarOrdenacaoNovo() {
+
+    manutencoes.sort((a, b) => {
+
+      let valorA = a[ordemCampoNovo] ?? "";
+      let valorB = b[ordemCampoNovo] ?? "";
+
+      // Se for data
+      if (ordemCampoNovo === "data") {
+        valorA = new Date(valorA);
+        valorB = new Date(valorB);
+      }
+
+      // Texto
+      if (typeof valorA === "string") {
+        return ordemDirecaoNovo === "asc"
+          ? valorA.localeCompare(valorB)
+          : valorB.localeCompare(valorA);
+      }
+
+      return ordemDirecaoNovo === "asc"
+        ? valorA - valorB
+        : valorB - valorA;
+    });
+  }
 
     // --------- RENDER ---------
     function renderNovo() {
+      aplicarOrdenacaoNovo();
       renderTabela("tabelaNovo", manutencoes, ["empresa","edificio","tipo","data","obs"], "totalNovo", "manutencoes", "formNovo");
     }
     function renderStock() {
@@ -265,6 +347,7 @@
           if (key === "filtros") { filtros.splice(index,1); renderFiltro(); }
           if (key === "notas") { notas.splice(index,1); renderNota(); }
           resetForm(form.id);
+          limparAlteracao();
         }
       };
     }
@@ -281,6 +364,7 @@
       if (filtros.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filtros), "Filtros");
       if (notas.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notas.map(n => ({Nota: n}))), "Notas");
       XLSX.writeFile(wb, "registoManutencoes.xlsx");
+      limparAlteracao();
     }
 
     // --------- IMPORTAR ---------
@@ -296,6 +380,7 @@
         if (workbook.Sheets["Filtros"]) { filtros = XLSX.utils.sheet_to_json(workbook.Sheets["Filtros"]); renderFiltro(); }
         if (workbook.Sheets["Notas"]) { const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Notas"]); notas = rows.map(r => r.Nota); renderNota(); }
         alert("Dados importados!");
+        limparAlteracao();
       };
       reader.readAsArrayBuffer(file);
     }
@@ -340,10 +425,10 @@
 
   // --------- ALERTA AO FECHAR JANELA ---------
   window.addEventListener("beforeunload", function (e) {
-    const mensagem = "Tem dados não exportados.\nDeseja exportar para Excel antes de sair?";
+  if (manutencoes.length || stock.length || notas.length) {
     e.preventDefault();
-    e.returnValue = mensagem; // obrigatório para o browser mostrar o alerta
-    return mensagem;
+    e.returnValue = "";
+  }
 });
 
   </script>
